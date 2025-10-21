@@ -140,6 +140,9 @@ playDropoff() { if (!this.audioCtx) return; const osc = this.audioCtx.createOsci
 };
 const keys = { ArrowUp: false, ArrowLeft: false, ArrowRight: false, };
 window.addEventListener('keydown', (e) => {
+if (audioManager.audioCtx && audioManager.audioCtx.state === 'suspended') {
+audioManager.audioCtx.resume();
+}
 if (e.code === 'Enter') {
 if (gameState === 'start' || gameState === 'gameOver' || gameState === 'levelComplete') {
 startGame(gameState === 'levelComplete' ? level + 1 : 1);
@@ -387,12 +390,24 @@ ctx.fillRect(this.x, this.y, this.width, this.height);
 }
 }
 }
+function generateStars() {
+stars = [];
+for (let i = 0; i < 400; i++) {
+stars.push({
+x: Math.random() * worldWidth,
+y: Math.random() * canvas.height,
+size: Math.random() * 2 + 1,
+parallax: Math.random() * 0.5 + 0.1
+});
+}
+}
 function generateLevel(level) {
 entities = [];
 const worldWidthFactor = 3;
 worldWidth = canvas.width * worldWidthFactor;
+generateStars();
 const segments = 150 * worldWidthFactor;
-const roughness = 0.4 - (level * 0.02);
+const roughness = 0.3 + (level * 0.01);
 const points = [];
 let y = canvas.height * (0.6 + Math.random() * 0.2);
 for (let i = 0; i <= segments; i++) {
@@ -402,7 +417,8 @@ if (y < canvas.height * 0.5) y = canvas.height * 0.5;
 if (y > canvas.height - 20) y = canvas.height - 20;
 }
 terrain = { points };
-const padWidthSegments = Math.max(10 - level, 4);
+const padWidthSegments = Math.max(20 - level, 12);
+const bufferSegments = 5;
 const padWidth = (padWidthSegments / segments) * worldWidth;
 const padIndices = [];
 padIndices.push(Math.floor(segments * 0.2) + Math.floor(Math.random() * 20 - 10));
@@ -410,11 +426,17 @@ padIndices.push(Math.floor(segments * 0.5) + Math.floor(Math.random() * 20 - 10)
 padIndices.push(Math.floor(segments * 0.8) + Math.floor(Math.random() * 20 - 10));
 const padTypes = ['rescue', 'fuel', 'dropoff'];
 padIndices.forEach((startIndex, i) => {
+if (startIndex + padWidthSegments + (bufferSegments * 2) > segments) {
+startIndex = segments - (padWidthSegments + (bufferSegments * 2)) - 1;
+}
+if (startIndex < 0) startIndex = 0;
 const padY = points[startIndex].y;
-const padX = points[startIndex].x;
+const padX = points[startIndex + bufferSegments].x;
 const padType = padTypes[i];
-for (let j = 0; j < padWidthSegments; j++) {
+for (let j = 0; j < padWidthSegments + (bufferSegments * 2); j++) {
+if (startIndex + j < points.length) {
 points[startIndex + j].y = padY;
+}
 }
 entities.push(new LandingPad(padX, padY, padWidth, padType));
 if (padType === 'rescue') {
@@ -469,17 +491,6 @@ ctx.closePath();
 ctx.fillStyle = '#808080';
 ctx.fill();
 }
-function generateStars() {
-stars = [];
-for (let i = 0; i < 400; i++) {
-stars.push({
-x: Math.random() * worldWidth,
-y: Math.random() * canvas.height,
-size: Math.random() * 2 + 1,
-parallax: Math.random() * 0.5 + 0.1
-});
-}
-}
 function drawStars() {
 ctx.save();
 ctx.fillStyle = 'white';
@@ -493,7 +504,7 @@ ctx.restore();
 }
 function drawHUD() {
 ctx.fillStyle = '#fff';
-ctx.font = '16px Orbitron';
+ctx.font = "16px Consolas, 'Courier New', monospace";
 ctx.textAlign = 'left';
 ctx.fillText(`Level: ${level}`, 10, 20);
 ctx.fillText(`Score: ${score}`, 10, 40);
@@ -535,18 +546,29 @@ function displayHighScores() {
 const scores = loadHighScores();
 scoreList.innerHTML = scores.map(s => `<li>${s}</li>`).join('');
 }
-function checkCollisions() {
-if (!lander || lander.crashed) return;
+function getTerrainYAtX(x) {
+if (!terrain || !terrain.points) return canvas.height;
+if (x < 0 || x > worldWidth) return canvas.height;
 for (let i = 0; i < terrain.points.length - 1; i++) {
 const p1 = terrain.points[i];
 const p2 = terrain.points[i + 1];
-if (lander.x > p1.x && lander.x < p2.x) {
-const terrainY = p1.y + (p2.y - p1.y) * ((lander.x - p1.x) / (p2.x - p1.x));
-if (lander.y + lander.height / 2 > terrainY) {
-handleLanding(terrainY);
+if (x >= p1.x && x <= p2.x) {
+return p1.y + (p2.y - p1.y) * ((x - p1.x) / (p2.x - p1.x));
 }
-break;
 }
+return canvas.height;
+}
+function checkCollisions() {
+if (!lander || lander.crashed) return;
+const leftFootX = lander.x - lander.width;
+const rightFootX = lander.x + lander.width;
+const terrainY_Left = getTerrainYAtX(leftFootX);
+const terrainY_Right = getTerrainYAtX(rightFootX);
+const terrainY_Center = getTerrainYAtX(lander.x);
+const collisionY = Math.min(terrainY_Left, terrainY_Right, terrainY_Center);
+const landerBottom = lander.y + lander.height / 2;
+if (landerBottom > collisionY) {
+handleLanding(collisionY, terrainY_Center);
 }
 if (lander.x < 0 || lander.x > worldWidth || lander.y < 0) {
 handleCrash("Lost in space!");
@@ -565,7 +587,7 @@ entities.splice(index, 1);
 }
 });
 }
-function handleLanding(groundY) {
+function handleLanding(groundY, terrainY_Center) {
 lander.y = groundY - lander.height / 2;
 audioManager.stopThrust();
 const safeAngle = Math.abs(lander.angle) < 0.1;
@@ -574,11 +596,15 @@ let padLandedOn = null;
 entities.forEach(e => {
 if (e instanceof LandingPad) {
 if (lander.x > e.x && lander.x < e.x + e.width) {
+if (Math.abs(terrainY_Center - e.y) < 1) {
 padLandedOn = e;
 }
 }
+}
 });
-if (padLandedOn && safeAngle && safeVelocity) {
+if (padLandedOn) {
+const didHitPad = Math.abs(groundY - padLandedOn.y) < 1;
+if (didHitPad && safeAngle && safeVelocity) {
 lander.landed = true;
 lander.vx = 0;
 lander.vy = 0;
@@ -603,22 +629,40 @@ const landingBonus = 500 * lander.people;
 const levelBonus = level * 1000;
 score += fuelBonus + landingBonus + levelBonus;
 lander.people = 0;
+if (level === 50) {
+setTimeout(() => {
+gameState = 'gameOver';
+showEndScreen(
+"CONGRATULATIONS!",
+`You've beaten the game! Final Score: ${score}`,
+"Press [ENTER] to Play Again"
+);
+}, 2000);
+} else {
 setTimeout(() => {
 gameState = 'levelComplete';
-showEndScreen("MISSION SUCCESSFUL", `Level ${level} complete! Score: ${score}`, "Press [ENTER] for Next Level");
+showEndScreen(
+"MISSION SUCCESSFUL",
+`Level ${level} complete! Score: ${score}`,
+"Press [ENTER] for Next Level"
+);
 }, 2000);
+}
 } else {
 audioManager.playLand();
 }
 break;
 case 'fuel':
 lander.fuel = FUEL_START - (level - 1) * 50;
-if (lander.fuel < 300) this.fuel = 300;
+if (lander.fuel < 300) lander.fuel = 300;
 audioManager.playPickup();
 break;
 }
-} else if (padLandedOn) {
+} else if (didHitPad) {
 handleCrash("Landed too fast on the pad!");
+} else {
+handleCrash("You crashed!");
+}
 } else {
 if (safeAngle && safeVelocity) {
 lander.landed = true;
@@ -667,6 +711,7 @@ gameOverScreen.classList.add('hidden');
 }
 function showEndScreen(title, message, prompt) {
 saveHighScore(score);
+displayHighScores();
 gameOverTitle.textContent = title;
 gameOverMessage.textContent = message;
 document.getElementById('game-over-prompt').textContent = prompt;
@@ -712,8 +757,7 @@ requestAnimationFrame(gameLoop);
 function resizeCanvas() {
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
-generateStars();
-if (gameState === 'playing' || gameState === 'start') {
+if (gameState === 'start') {
 generateLevel(level);
 if (lander) lander.reset();
 }
