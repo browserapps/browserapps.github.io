@@ -1,343 +1,229 @@
 <!DOCTYPE html>
 <html lang="en">
-
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Notepad (C) Johnny Heggelund</title>
-  <style>
-    body {
-      font-family: monospace;
-      background-color: #121212;
-      color: #eeeeee;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      margin: 0;
-      padding: 1rem 0;
-    }
-
-    #toolbar {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      background: #181818;
-      border-radius: 12px;
-      padding: 10px 12px 6px 12px;
-      max-width: 768px;
-      width: 100%;
-      margin-bottom: 0.5rem;
-      justify-content: center;
-      align-items: center;
-      box-sizing: border-box;
-      position: sticky;
-      top: 1rem;
-      z-index: 100;
-      border: 1px solid #333;
-    }
-
-    #toolbar button {
-      background: #232323;
-      color: #eee;
-      border: 1px solid #333;
-      border-radius: 8px;
-      padding: 6px 16px;
-      font-size: 1rem;
-      cursor: pointer;
-      transition: background 0.2s, box-shadow 0.2s;
-      min-width: 38px;
-      min-height: 38px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-sizing: border-box;
-    }
-
-    #toolbar button:hover {
-      background: #333;
-      box-shadow: 0 2px 8px 0 #0002;
-    }
-
-    #notepad {
-      max-width: 768px;
-      width: 100%;
-      min-height: 70vh;
-      padding: 20px;
-      background-color: #222;
-      border: 1px solid #444;
-      color: #eee;
-      font-size: 1rem;
-      line-height: 1.5;
-      border-radius: 14px;
-      box-sizing: border-box;
-      outline: none;
-    }
-
-    #notepad a {
-      color: #7ecbff;
-      text-decoration: underline;
-      transition: color 0.2s;
-    }
-
-    #notepad a:hover {
-      color: #b3e0ff;
-    }
-
-    #notepad pre {
-      background: #111;
-      border: 1px solid #333;
-      padding: 1em;
-      border-radius: 8px;
-      white-space: pre-wrap;
-      font-family: 'Courier New', Courier, monospace;
-    }
-
-    h1 {
-      margin-top: 0;
-    }
-
-    #opened-filename {
-      width: 100%;
-      max-width: 768px;
-      margin: 0 auto 6px auto;
-      text-align: center;
-      color: #7ecbff;
-      font-size: 0.95rem;
-      display: none;
-    }
-  </style>
-</head>
-
-<body>
-  <div id="opened-filename"></div>
-  <div id="toolbar">
-    <button type="button" id="open-btn" title="Open file">📂</button>
-    <button type="button" id="save-btn" title="Save file (Ctrl+S)">💾</button>
-    <button type="button" id="clear-btn" title="Clear notes">🗑️</button>
-    <button type="button" class="format-btn" data-command="bold" title="Bold (Ctrl+B)"><b>B</b></button>
-    <button type="button" class="format-btn" data-command="italic" title="Italic (Ctrl+I)"><i>I</i></button>
-    <button type="button" class="format-btn" data-command="underline" title="Underline (Ctrl+U)"><u>U</u></button>
-    <button type="button" class="format-btn" data-command="strikeThrough"
-      title="Strikethrough (Ctrl+D)"><s>S</s></button>
-    <button type="button" class="format-block-btn" data-tag="h2" title="Heading">H2</button>
-    <button type="button" class="format-block-btn" data-tag="pre" title="Code Block">&lt;/&gt;</button>
-    <button type="button" class="format-btn" data-command="insertUnorderedList" title="Bulleted List">• List</button>
-    <button type="button" class="format-btn" data-command="insertOrderedList" title="Numbered List">1. List</button>
-    <button type="button" class="format-btn" data-command="justifyLeft" title="Justify Left">L</button>
-    <button type="button" class="format-btn" data-command="justifyCenter" title="Justify Center">C</button>
-    <button type="button" class="format-btn" data-command="justifyRight" title="Justify Right">R</button>
-    <button type="button" id="link-btn" title="Link">🔗</button>
-    <button type="button" id="image-btn" title="Image">🖼️</button>
-    <input type="file" id="image-upload" accept="image/*" style="display:none">
-    <button type="button" class="format-btn" data-command="undo" title="Undo (Ctrl+Z)">↺</button>
-    <button type="button" class="format-btn" data-command="redo" title="Redo (Ctrl+Y)">↻</button>
-    <button type="button" id="clear-format-btn" title="Clear Formatting">🧹</button>
-  </div>
-  <div id="notepad" contenteditable="true" role="main"></div>
-  <script>
-    (function () {
-      const NotepadApp = {
-        notepad: null,
-        imageUpload: null,
-        openedFilename: null,
-        currentFilename: '',
-        MAX_IMAGE_WIDTH: 1920,
-        IMAGE_QUALITY: 0.9,
-        init() {
-          this.cacheDOMElements();
-          this.loadFromLocalStorage();
-          this.bindEvents();
-        },
-        cacheDOMElements() {
-          this.notepad = document.getElementById('notepad');
-          this.imageUpload = document.getElementById('image-upload');
-          this.openedFilename = document.getElementById('opened-filename');
-        },
-        bindEvents() {
-          document.getElementById('open-btn').addEventListener('click', () => this.openFile());
-          document.getElementById('save-btn').addEventListener('click', () => this.saveFile());
-          document.getElementById('clear-btn').addEventListener('click', () => this.clearNotes());
-          document.getElementById('link-btn').addEventListener('click', () => this.insertLink());
-          document.getElementById('image-btn').addEventListener('click', () => this.imageUpload.click());
-          document.getElementById('clear-format-btn').addEventListener('click', () => this.clearFormatting());
-          document.querySelectorAll('.format-btn').forEach(btn => {
-            btn.addEventListener('click', () => this.format(btn.dataset.command));
-          });
-          document.querySelectorAll('.format-block-btn').forEach(btn => {
-            btn.addEventListener('click', () => this.formatBlock(btn.dataset.tag));
-          });
-          this.imageUpload.addEventListener('change', (e) => this.handleImageUpload(e));
-          this.notepad.addEventListener('input', () => this.saveToLocalStorage());
-          this.notepad.addEventListener('keydown', (e) => this.handleKeyDown(e));
-          this.notepad.addEventListener('paste', (e) => this.handlePaste(e));
-        },
-        handleKeyDown(e) {
-          if (e.ctrlKey && !e.shiftKey) {
-            let command;
-            switch (e.key.toLowerCase()) {
-              case 'b': command = 'bold'; break;
-              case 'i': command = 'italic'; break;
-              case 'u': command = 'underline'; break;
-              case 'd': command = 'strikeThrough'; break;
-              case 's': e.preventDefault(); this.saveFile(); break;
-            }
-            if (command) {
-              e.preventDefault();
-              this.format(command);
-            }
-          }
-        },
-        handleImageUpload(e) {
-          const file = e.target.files[0];
-          if (file) {
-            this.processImageFile(file);
-          }
-          e.target.value = '';
-        },
-        handlePaste(e) {
-          const items = (e.clipboardData || window.clipboardData).items;
-          for (const item of items) {
-            if (item.type.startsWith('image/')) {
-              e.preventDefault();
-              const blob = item.getAsFile();
-              this.processImageFile(blob);
-            }
-          }
-        },
-        format(command, value = null) {
-          document.execCommand(command, false, value);
-          this.notepad.focus();
-        },
-        formatBlock(tag) {
-          const selection = window.getSelection();
-          if (selection.rangeCount === 0) return;
-          let container = selection.getRangeAt(0).commonAncestorContainer;
-          container = container.nodeType === 3 ? container.parentNode : container;
-          const newTag = container.closest(tag) ? 'div' : tag;
-          this.format('formatBlock', newTag);
-        },
-        clearFormatting() {
-          this.format('removeFormat');
-        },
-        insertLink() {
-          const url = prompt('Enter URL:', 'https://');
-          if (url) {
-            this.format('createLink', url);
-          }
-        },
-        clearNotes() {
-          if (confirm("Are you sure you want to clear the entire note?")) {
-            this.notepad.innerHTML = '';
-            this.currentFilename = '';
-            this.openedFilename.textContent = '';
-            this.openedFilename.style.display = 'none';
-            this.saveToLocalStorage();
-          }
-        },
-        saveFile() {
-          const defaultName = this.currentFilename || 'my-notes.html';
-          const fileName = prompt("Enter a filename for your note:", defaultName);
-          if (!fileName) return;
-          const content = this.notepad.innerHTML;
-          const finalHtml = this.createHtmlTemplate(content);
-          const blob = new Blob([finalHtml], { type: 'text/html' });
-          const link = document.createElement('a');
-          link.href = URL.createObjectURL(blob);
-          link.download = fileName.endsWith('.html') ? fileName : `${fileName}.html`;
-          link.click();
-          URL.revokeObjectURL(link.href);
-        },
-        openFile() {
-          const fileInput = document.createElement('input');
-          fileInput.type = 'file';
-          fileInput.accept = '.html';
-          fileInput.onchange = (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = (event) => {
-              const content = event.target.result;
-              const doc = new DOMParser().parseFromString(content, 'text/html');
-              const generatorMeta = doc.querySelector('meta[name="generator"][content="WebNotepad"]');
-              const loadedNotepad = doc.getElementById('notepad');
-              if (generatorMeta && loadedNotepad) {
-                this.notepad.innerHTML = loadedNotepad.innerHTML;
-                this.currentFilename = file.name;
-                this.openedFilename.textContent = `Opened: ${file.name}`;
-                this.openedFilename.style.display = 'block';
-                this.saveToLocalStorage();
-              } else {
-                alert("File cannot be opened. It was not created with this notepad.");
-              }
-            };
-            reader.readAsText(file);
-          };
-          fileInput.click();
-        },
-        saveToLocalStorage() {
-          localStorage.setItem('webNotebookContent', this.notepad.innerHTML);
-        },
-        loadFromLocalStorage() {
-          const savedContent = localStorage.getItem('webNotebookContent');
-          if (savedContent) {
-            this.notepad.innerHTML = savedContent;
-          }
-        },
-        processImageFile(file) {
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            const tempImg = new Image();
-            tempImg.onload = () => {
-              const canvas = document.createElement('canvas');
-              const ctx = canvas.getContext('2d');
-              const scaleFactor = tempImg.width > this.MAX_IMAGE_WIDTH ? this.MAX_IMAGE_WIDTH / tempImg.width : 1;
-              canvas.width = tempImg.width * scaleFactor;
-              canvas.height = tempImg.height * scaleFactor;
-              ctx.drawImage(tempImg, 0, 0, canvas.width, canvas.height);
-              const dataUrl = canvas.toDataURL('image/jpeg', this.IMAGE_QUALITY);
-              this.format('insertHTML', `<img src="${dataUrl}" alt="User-uploaded image">`);
-            };
-            tempImg.src = event.target.result;
-          };
-          reader.readAsDataURL(file);
-        },
-        createHtmlTemplate(content) {
-          return `
-<!DOCTYPE html>
-<html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="generator" content="WebNotepad">
-<title>My Note</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Notepad</title>
 <style>
-body { font-family: monospace; background-color: #121212; color: #eeeeee; display: flex; flex-direction: column; align-items: center; min-height: 100vh; margin: 0; }
-#notepad { max-width: 768px; width: 100%; padding: 20px; background-color: #222; border: 1px solid #444; color: #eee; font-size: 1rem; line-height: 1.5; border-radius: 14px; box-sizing: border-box; margin: 20px auto; }
-#notepad img { max-width: 100%; height: auto; display: block; margin: 8px 0; cursor: pointer; border-radius: 4px; }
-#notepad a { color: #7ecbff; }
-#notepad pre { background: #111; border: 1px solid #333; padding: 1em; border-radius: 8px; white-space: pre-wrap; }
+body, html {
+margin: 0;
+padding: 0;
+width: 100%;
+height: 100%;
+background-color: #000;
+color: #eee;
+font-family: monospace;
+font-size: 16px;
+}
+#editor {
+width: 100%;
+height: 100%;
+padding: 0;
+box-sizing: border-box;
+outline: none;
+white-space: pre-wrap;
+word-wrap: break-word;
+overflow-y: auto;
+}
+#editor img {
+max-width: 100%;
+min-width: 100%;
+height: auto;
+margin: 0;
+display: block;
+}
+#controls {
+position: fixed;
+top: 15px;
+right: 20px;
+z-index: 100;
+}
+#controls button {
+background-color: #333;
+color: #fff;
+border: 1px solid #555;
+padding: 8px 12px;
+cursor: pointer;
+font-family: monospace;
+margin-left: 10px;
+}
+#controls button:hover {
+background-color: #444;
+}
 </style>
 </head>
 <body>
-<div id="notepad">${content}</div>
+<input type="file" id="fileInput" accept=".txt,.encrypted" style="display:none;">
+<div id="controls">
+<button id="saveButton">Save Encrypted Note</button>
+<button id="openButton">Open Encrypted Note</button>
+</div>
+<div id="editor" contenteditable="true" spellcheck="false" autofocus="true"></div>
 <script>
-document.getElementById('notepad').addEventListener('click', function(e) {
-if (e.target.tagName === 'IMG' && e.target.src.startsWith('data:image')) {
-const newWindow = window.open();
-newWindow.document.write(\`
-<!DOCTYPE html>
-<head><title>Full Size Image</title><style>body{margin:0; background-color:#121212; display:flex; justify-content:center; align-items:center; height:100vh;} img{max-width:100%; max-height:100vh; object-fit:contain;}</style></head>
-<body><img src="\${e.target.src}" alt="Full size image"></body>
-\`);
+const editor = document.getElementById('editor');
+const saveButton = document.getElementById('saveButton');
+const openButton = document.getElementById('openButton');
+const fileInput = document.getElementById('fileInput');
+const CRYPTO_PARAMS = {
+name: 'AES-GCM',
+iterations: 100000,
+saltLength: 16,
+ivLength: 12,
+keyLength: 256
+};
+editor.addEventListener('paste', (e) => {
+e.preventDefault();
+const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+let foundImage = false;
+for (const item of items) {
+if (item.type.indexOf('image') === 0) {
+foundImage = true;
+const blob = item.getAsFile();
+const reader = new FileReader();
+reader.onload = (event) => {
+const img = document.createElement('img');
+img.src = event.target.result;
+const selection = window.getSelection();
+if (selection.rangeCount > 0) {
+const range = selection.getRangeAt(0);
+range.deleteContents();
+range.insertNode(img);
+range.setStartAfter(img);
+selection.removeAllRanges();
+selection.addRange(range);
+} else {
+editor.appendChild(img);
+}
+};
+reader.readAsDataURL(blob);
+}
+}
+if (!foundImage) {
+const text = (e.clipboardData || e.originalEvent.clipboardData).getData('text/plain');
+document.execCommand('insertText', false, text);
 }
 });
-<\/script>
+saveButton.addEventListener('click', async () => {
+const password = prompt("Enter a password to encrypt this note:");
+if (!password) {
+alert("Save cancelled. No password provided.");
+return;
+}
+try {
+const content = editor.innerHTML;
+const encryptedJson = await encrypt(content, password);
+downloadFile(encryptedJson, 'note.encrypted.txt', 'application/json');
+} catch (err) {
+console.error("Encryption failed:", err);
+alert("Error during encryption. Check console for details.");
+}
+});
+openButton.addEventListener('click', () => {
+fileInput.click();
+});
+fileInput.addEventListener('change', (e) => {
+const file = e.target.files[0];
+if (!file) return;
+const password = prompt("Enter password to open note:");
+if (!password) {
+alert("Open cancelled. No password provided.");
+return;
+}
+const reader = new FileReader();
+reader.onload = async (event) => {
+try {
+const encryptedJson = event.target.result;
+const decryptedHtml = await decrypt(encryptedJson, password);
+editor.innerHTML = decryptedHtml;
+} catch (err) {
+console.error("Decryption failed:", err);
+alert("Decryption failed. Wrong password or corrupted file.");
+} finally {
+fileInput.value = null;
+}
+};
+reader.readAsText(file);
+});
+async function deriveKey(password, salt) {
+const enc = new TextEncoder();
+const keyMaterial = await crypto.subtle.importKey(
+'raw',
+enc.encode(password),
+{ name: 'PBKDF2' },
+false,
+['deriveKey']
+);
+return crypto.subtle.deriveKey(
+{
+name: 'PBKDF2',
+salt: salt,
+iterations: CRYPTO_PARAMS.iterations,
+hash: 'SHA-256'
+},
+keyMaterial,
+{ name: CRYPTO_PARAMS.name, length: CRYPTO_PARAMS.keyLength },
+true,
+['encrypt', 'decrypt']
+);
+}
+async function encrypt(plaintext, password) {
+const enc = new TextEncoder();
+const data = enc.encode(plaintext);
+const salt = crypto.getRandomValues(new Uint8Array(CRYPTO_PARAMS.saltLength));
+const iv = crypto.getRandomValues(new Uint8Array(CRYPTO_PARAMS.ivLength));
+const key = await deriveKey(password, salt);
+const encryptedBuffer = await crypto.subtle.encrypt(
+{ name: CRYPTO_PARAMS.name, iv: iv },
+key,
+data
+);
+return JSON.stringify({
+salt: arrayBufferToBase64(salt),
+iv: arrayBufferToBase64(iv),
+ciphertext: arrayBufferToBase64(encryptedBuffer)
+});
+}
+async function decrypt(encryptedJson, password) {
+const data = JSON.parse(encryptedJson);
+const salt = base64ToArrayBuffer(data.salt);
+const iv = base64ToArrayBuffer(data.iv);
+const ciphertext = base64ToArrayBuffer(data.ciphertext);
+const key = await deriveKey(password, salt);
+const decryptedBuffer = await crypto.subtle.decrypt(
+{ name: CRYPTO_PARAMS.name, iv: iv },
+key,
+ciphertext
+);
+const dec = new TextDecoder();
+return dec.decode(decryptedBuffer);
+}
+function downloadFile(content, fileName, contentType) {
+const a = document.createElement('a');
+const file = new Blob([content], { type: contentType });
+a.href = URL.createObjectURL(file);
+a.download = fileName;
+a.click();
+URL.revokeObjectURL(a.href);
+}
+function arrayBufferToBase64(buffer) {
+let binary = '';
+const bytes = new Uint8Array(buffer);
+const len = bytes.byteLength;
+for (let i = 0; i < len; i++) {
+binary += String.fromCharCode(bytes[i]);
+}
+return window.btoa(binary);
+}
+function base64ToArrayBuffer(base64) {
+const binary_string = window.atob(base64);
+const len = binary_string.length;
+const bytes = new Uint8Array(len);
+for (let i = 0; i < len; i++) {
+bytes[i] = binary_string.charCodeAt(i);
+}
+return bytes.buffer;
+}
+editor.focus();
+</script>
 </body>
-</html>`;
-        }
-      };
-      document.addEventListener('DOMContentLoaded', () => NotepadApp.init());
-    })();
-  </script>
-</body>
-
 </html>
