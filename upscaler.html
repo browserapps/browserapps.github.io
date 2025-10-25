@@ -54,7 +54,9 @@
             font-weight: 600;
         }
         .file-drop-area {
-            border: 2px solid var(--text-muted); /* Kept solid as requested */
+            /* --- FIX #1: Added display: block; --- */
+            display: block;
+            border: 2px solid var(--text-muted);
             border-radius: 8px;
             padding: 2rem;
             text-align: center;
@@ -384,7 +386,7 @@
                     status.textContent = '✅ Done!';
                     upscaleButton.disabled = false;
 
-                } catch (err) {
+                } catch (err) { // This block is now correct
                     status.textContent = 'Error: ' + err.message;
                     console.error(err);
                     upscaleButton.disabled = false;
@@ -392,8 +394,9 @@
             }
             
             // --- INITIALIZE UI ---
-            // Run this once on load to set the correct scale options
-            updateScaleOptions();
+            // --- FIX #2: Force the select box to 'fast' on load ---
+            modelSelect.value = 'fast'; 
+            updateScaleOptions(); // Run this once on load
 
         }; // END of window.onload
     </script>
