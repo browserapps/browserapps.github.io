@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2x AI Upscaler</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@upscalerjs/esrgan-slim@latest/dist/umd/2x.min.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/upscaler@latest/dist/browser/umd/upscaler.min.js"></script>
+
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: grid;
+            place-items: center;
+            min-height: 90vh;
+            background: #f0f2f5;
+            color: #333;
+            margin: 0;
+        }
+        .container {
+            background: #ffffff;
+            padding: 2.5rem;
+            border-radius: 12px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 90%;
+            max-width: 450px;
+        }
+        h2 {
+            margin-top: 0;
+            color: #111;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        label.button {
+            display: inline-block;
+            background: #007bff;
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: background 0.2s;
+        }
+        label.button:hover {
+            background: #0056b3;
+        }
+        a.button {
+            display: none; /* Hidden at first */
+            background: #28a745;
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 500;
+            margin-top: 1.5rem;
+            transition: background 0.2s;
+        }
+        a.button:hover {
+            background: #218838;
+        }
+        #status {
+            margin-top: 1.5rem;
+            font-size: 0.95rem;
+            color: #555;
+            height: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>2x AI Upscaler Tool</h2>
+        <p>Upscales your 1024px image to 2048px using AI. Your image stays on your computer.</p>
+        
+        <label for="uploader" class="button">1. Choose Your 1024x1024 Image</label>
+        <input type="file" id="uploader" accept="image/*">
+        
+        <div id="status"></div>
+        
+        <a id="downloadLink" class="button">2. Download 2048x2048 Image</a>
+    </div>
+
+    <script>
+        // Wait for all files (including scripts) to load
+        window.onload = function() {
+            
+            // Get the elements from the page
+            const uploader = document.getElementById('uploader');
+            const status = document.getElementById('status');
+            const downloadLink = document.getElementById('downloadLink');
+
+            // Initialize the AI upscaler
+            // THIS IS THE FIX: The correct variable name for the model is "ESRGANSlim2x"
+            const upscaler = new Upscaler({
+                model: window.ESRGANSlim2x 
+            });
+
+            // What to do when you select a file
+            uploader.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (!file) {
+                    return;
+                }
+
+                // Hide old link and show status
+                downloadLink.style.display = 'none';
+                status.textContent = 'Loading image...';
+
+                const reader = new FileReader();
+                
+                // When the file is loaded into the browser's memory
+                reader.onload = (event) => {
+                    const img = new Image();
+                    
+                    // When the image itself is ready
+                    img.onload = () => {
+                        status.textContent = '🧠 AI is upscaling... (this may take a moment)';
+                        
+                        // This is the magic AI part!
+                        upscaler.upscale(img, {
+                            patchSize: 64, // Helps with performance on devices like Chromebooks
+                            padding: 6
+                        }).then((upscaledSrc) => {
+                            // Success!
+                            status.textContent = '✅ Done!';
+                            downloadLink.href = upscaledSrc;
+                            downloadLink.download = 'upscaled-2048.png';
+                            downloadLink.style.display = 'inline-block';
+                        }).catch(err => {
+                            // Handle errors
+                            status.textContent = 'Error: ' + err.message;
+                            console.error(err);
+                        });
+                    };
+                    img.src = event.target.result; // This triggers the img.onload
+                };
+                reader.readAsDataURL(file); // This triggers the reader.onload
+            });
+
+        }; // END of window.onload
+    </script>
+
+</body>
+</html>
