@@ -3,148 +3,399 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2x AI Upscaler</title>
+    <title>Professional AI Upscaler</title>
     
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     
     <script src="https://cdn.jsdelivr.net/npm/@upscalerjs/esrgan-slim@latest/dist/umd/2x.min.js"></script>
     
+    <script src="https://cdn.jsdelivr.net/npm/@upscalerjs/esrgan-slim@latest/dist/umd/4x.min.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/@upscalerjs/default-model@latest/dist/umd/index.min.js"></script>
+    
     <script src="https://cdn.jsdelivr.net/npm/upscaler@latest/dist/browser/umd/upscaler.min.js"></script>
 
     <style>
+        :root {
+            --bg-color: #1a1a1a;
+            --card-color: #2a2a2a;
+            --text-color: #e0e0e0;
+            --text-muted: #888888;
+            --primary-color: #0d6efd;
+            --primary-hover: #0a58ca;
+            --success-color: #198754;
+            --success-hover: #157347;
+            --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-family: var(--font-family);
             display: grid;
             place-items: center;
             min-height: 90vh;
-            background: #f0f2f5;
-            color: #333;
+            background: var(--bg-color);
+            color: var(--text-color);
             margin: 0;
+            padding: 1rem;
         }
         .container {
-            background: #ffffff;
+            background: var(--card-color);
             padding: 2.5rem;
             border-radius: 12px;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.1);
-            text-align: center;
-            width: 90%;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            text-align: left;
+            width: 100%;
             max-width: 450px;
+            border: 1px solid #333;
         }
         h2 {
             margin-top: 0;
-            color: #111;
+            margin-bottom: 1rem;
+            text-align: center;
+            font-weight: 600;
+        }
+        .file-drop-area {
+            border: 2px solid var(--text-muted); /* Kept solid as requested */
+            border-radius: 8px;
+            padding: 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background-color 0.2s;
+        }
+        .file-drop-area:hover, .file-drop-area.dragover {
+            background: #333;
+            border-color: var(--primary-color);
+        }
+        .file-drop-area p {
+            margin: 0;
+            font-size: 1rem;
+            color: var(--text-muted);
+        }
+        .file-drop-area p strong {
+            color: var(--primary-color);
+        }
+        #fileName {
+            text-align: center;
+            font-style: italic;
+            color: var(--text-muted);
+            margin-top: 0.5rem;
+            height: 1.2em;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
         input[type="file"] {
             display: none;
         }
-        label.button {
-            display: inline-block;
-            background: #007bff;
-            color: #fff;
-            padding: 12px 20px;
-            border-radius: 8px;
-            cursor: pointer;
+        .options {
+            margin-top: 1.5rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            align-items: center;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .control-group label {
+            font-size: 0.9rem;
             font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+        }
+        select, button {
+            font-family: var(--font-family);
+            font-size: 1rem;
+            padding: 0.75rem;
+            border-radius: 8px;
+            border: 1px solid #444;
+            background: #333;
+            color: var(--text-color);
+        }
+        button.button-primary {
+            grid-column: 1 / -1; /* Span full width */
+            margin-top: 1.5rem;
+            background: var(--primary-color);
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
             transition: background 0.2s;
         }
-        label.button:hover {
-            background: #0056b3;
+        button.button-primary:hover {
+            background: var(--primary-hover);
         }
-        a.button {
+        button.button-primary:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+        a.button-success {
             display: none; /* Hidden at first */
-            background: #28a745;
+            grid-column: 1 / -1;
+            margin-top: 1.5rem;
+            background: var(--success-color);
             color: #fff;
-            padding: 12px 20px;
+            padding: 0.75rem;
             border-radius: 8px;
             text-decoration: none;
-            font-weight: 500;
-            margin-top: 1.5rem;
+            font-weight: 600;
+            text-align: center;
             transition: background 0.2s;
         }
-        a.button:hover {
-            background: #218838;
+        a.button-success:hover {
+            background: var(--success-hover);
         }
         #status {
             margin-top: 1.5rem;
             font-size: 0.95rem;
-            color: #555;
-            height: 20px;
+            color: var(--text-muted);
+            height: 2.5em; /* Adjusted height for 2-line warning */
+            text-align: center;
+            line-height: 1.25em;
+        }
+        
+        /* --- Tooltip Styles --- */
+        .info-icon {
+            position: relative;
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            background: var(--text-muted);
+            color: var(--card-color);
+            border-radius: 50%;
+            text-align: center;
+            font-size: 12px;
+            line-height: 16px;
+            font-weight: bold;
+            cursor: help;
+            margin-left: 8px;
+        }
+        .tooltip {
+            display: none;
+            position: absolute;
+            bottom: 125%; /* Position above the icon */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 240px;
+            background: #333;
+            color: var(--text-color);
+            padding: 1rem;
+            border-radius: 8px;
+            font-size: 0.85rem;
+            font-weight: normal;
+            z-index: 10;
+            border: 1px solid #444;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            line-height: 1.4;
+            text-align: left;
+        }
+        .tooltip strong {
+            color: var(--primary-color);
+        }
+        .info-icon:hover .tooltip {
+            display: block;
         }
     </style>
 </head>
 <body>
-
     <div class="container">
-        <h2>2x AI Upscaler Tool</h2>
-        <p>Upscales your 1024px image to 2048px using AI. Your image stays on your computer.</p>
+        <h2>Professional AI Upscaler</h2>
         
-        <label for="uploader" class="button">1. Choose Your 1024x1024 Image</label>
+        <label for="uploader" class="file-drop-area" id="dropArea">
+            <p><strong>Click to browse</strong> or drag and drop an image</p>
+        </label>
         <input type="file" id="uploader" accept="image/*">
+        <p id="fileName"></p>
         
+        <div class="options">
+            <div class="control-group">
+                <label for="modelSelect">
+                    Model Engine
+                    <span class="info-icon">?
+                        <div class="tooltip">
+                            <strong>Fast (ESRGAN-Slim):</strong>
+                            <br>
+                            Best for photos and general textures. Very fast. Supports 2x and 4x scaling.
+                            <br><br>
+                            <strong>Quality (RDN):</strong>
+                            <br>
+                            Better for digital art, text, and cartoons. Slower, but produces cleaner results with fewer artifacts. Only supports 2x.
+                        </div>
+                    </span>
+                </label>
+                <select id="modelSelect">
+                    <option value="fast" selected>Fast (ESRGAN-Slim)</option>
+                    <option value="quality">Quality (RDN)</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="scaleSelect">Scale Factor</label>
+                <select id="scaleSelect">
+                    <option value="2">2x</option>
+                    <option value="4">4x</option>
+                </select>
+            </div>
+        </div>
+
+        <button class="button-primary" id="upscaleButton" disabled>Upscale Image</button>
+        <a id="downloadLink" class="button-success">Download Upscaled Image</a>
         <div id="status"></div>
-        
-        <a id="downloadLink" class="button">2. Download 2048x2048 Image</a>
     </div>
 
     <script>
-        // Wait for all files (including scripts) to load
         window.onload = function() {
             
-            // Get the elements from the page
+            // --- Global Variables ---
+            let upscalerSlim2x, upscalerSlim4x, upscalerQuality2x, originalImage, originalFileName;
+            
+            // --- Get Elements ---
             const uploader = document.getElementById('uploader');
             const status = document.getElementById('status');
             const downloadLink = document.getElementById('downloadLink');
+            const upscaleButton = document.getElementById('upscaleButton');
+            const modelSelect = document.getElementById('modelSelect');
+            const scaleSelect = document.getElementById('scaleSelect');
+            const fileNameDisplay = document.getElementById('fileName');
+            const dropArea = document.getElementById('dropArea');
+            const scaleOption4x = scaleSelect.querySelector('option[value="4"]');
 
-            // Initialize the AI upscaler
-            // THIS IS THE FIX: The correct variable name for the model is "ESRGANSlim2x"
-            const upscaler = new Upscaler({
-                model: window.ESRGANSlim2x 
+            // --- Initialize AI Models ---
+            try {
+                status.textContent = 'Loading AI models...';
+                upscalerSlim2x = new Upscaler({ model: window.ESRGANSlim2x });
+                upscalerSlim4x = new Upscaler({ model: window.ESRGANSlim4x });
+                upscalerQuality2x = new Upscaler({ model: window.DefaultUpscalerJSModel });
+                status.textContent = 'Models loaded. Ready.';
+            } catch (err) {
+                status.textContent = 'Error loading models. Please refresh.';
+                console.error(err);
+                return;
+            }
+
+            // --- Event Listeners ---
+            
+            // Drag and Drop
+            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, preventDefaults, false);
             });
+            function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
+            ['dragenter', 'dragover'].forEach(eventName => {
+                dropArea.addEventListener(eventName, () => dropArea.classList.add('dragover'), false);
+            });
+            ['dragleave', 'drop'].forEach(eventName => {
+                dropArea.addEventListener(eventName, () => dropArea.classList.remove('dragover'), false);
+            });
+            dropArea.addEventListener('drop', handleDrop, false);
 
-            // What to do when you select a file
+            function handleDrop(e) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+            
+            // File Uploader
             uploader.addEventListener('change', (e) => {
-                const file = e.target.files[0];
-                if (!file) {
+                handleFile(e.target.files[0]);
+            });
+            
+            // Model Selection Logic
+            modelSelect.addEventListener('change', updateScaleOptions);
+
+            function updateScaleOptions() {
+                if (modelSelect.value === 'quality') {
+                    // "Quality" model only supports 2x
+                    scaleOption4x.style.display = 'none';
+                    if (scaleSelect.value === '4') {
+                        scaleSelect.value = '2'; // Force back to 2x
+                    }
+                } else {
+                    // "Fast" model supports both
+                    scaleOption4x.style.display = 'block';
+                }
+            }
+
+            // Upscale Button
+            upscaleButton.addEventListener('click', processImage);
+
+            // --- Main Functions ---
+
+            function handleFile(file) {
+                if (!file || !file.type.startsWith('image/')) {
+                    originalImage = null;
+                    upscaleButton.disabled = true;
+                    fileNameDisplay.textContent = 'Please select a valid image file.';
                     return;
                 }
 
-                // Hide old link and show status
-                downloadLink.style.display = 'none';
-                status.textContent = 'Loading image...';
-
-                const reader = new FileReader();
+                originalFileName = file.name.split('.').slice(0, -1).join('.'); // Get name without extension
+                fileNameDisplay.textContent = file.name;
                 
-                // When the file is loaded into the browser's memory
+                const reader = new FileReader();
                 reader.onload = (event) => {
-                    const img = new Image();
-                    
-                    // When the image itself is ready
-                    img.onload = () => {
-                        status.textContent = '🧠 AI is upscaling... (this may take a moment)';
-                        
-                        // This is the magic AI part!
-                        upscaler.upscale(img, {
-                            patchSize: 64, // Helps with performance on devices like Chromebooks
-                            padding: 6
-                        }).then((upscaledSrc) => {
-                            // Success!
-                            status.textContent = '✅ Done!';
-                            downloadLink.href = upscaledSrc;
-                            downloadLink.download = 'upscaled-2048.png';
-                            downloadLink.style.display = 'inline-block';
-                        }).catch(err => {
-                            // Handle errors
-                            status.textContent = 'Error: ' + err.message;
-                            console.error(err);
-                        });
+                    originalImage = new Image();
+                    originalImage.onload = () => {
+                        upscaleButton.disabled = false;
+                        status.textContent = 'Image loaded. Ready to upscale.';
+                        downloadLink.style.display = 'none';
                     };
-                    img.src = event.target.result; // This triggers the img.onload
+                    originalImage.src = event.target.result;
                 };
-                reader.readAsDataURL(file); // This triggers the reader.onload
-            });
+                reader.readAsDataURL(file);
+            }
+
+            async function processImage() {
+                if (!originalImage) return;
+
+                try {
+                    // --- 1. Get Options ---
+                    const scale = scaleSelect.value;
+                    const model = modelSelect.value;
+                    let upscaler;
+
+                    // --- 2. Select the correct upscaler ---
+                    if (model === 'fast') {
+                        upscaler = (scale === '4') ? upscalerSlim4x : upscalerSlim2x;
+                    } else {
+                        // Quality model only has 2x
+                        upscaler = upscalerQuality2x;
+                    }
+
+                    // --- 3. Disable UI & Show Warning ---
+                    upscaleButton.disabled = true;
+                    downloadLink.style.display = 'none';
+                    
+                    if (model === 'fast' && scale === '4') {
+                        status.innerHTML = '🧠 4x upscale starting...<br>This may freeze your browser for a moment.';
+                    } else {
+                        status.textContent = '🧠 AI is upscaling...';
+                    }
+
+                    // --- 4. AI Upscaling ---
+                    const upscaledSrc = await upscaler.upscale(originalImage, {
+                        patchSize: 64, // Helps with performance
+                        padding: 6
+                    });
+
+                    // --- 5. Success ---
+                    const newFileName = `${originalFileName}_${model}_${scale}x.png`;
+                    downloadLink.href = upscaledSrc;
+                    downloadLink.download = newFileName;
+                    downloadLink.style.display = 'block';
+                    status.textContent = '✅ Done!';
+                    upscaleButton.disabled = false;
+
+                } catch (err) {
+                    status.textContent = 'Error: ' + err.message;
+                    console.error(err);
+                    upscaleButton.disabled = false;
+                }
+            }
+            
+            // --- INITIALIZE UI ---
+            // Run this once on load to set the correct scale options
+            updateScaleOptions();
 
         }; // END of window.onload
     </script>
-
 </body>
 </html>
